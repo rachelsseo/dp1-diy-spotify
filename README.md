@@ -111,7 +111,7 @@ An example:
   "year": 2020
 }
 ```
-Each song package (all 3 files) must contain five data points: `title`, `album`, `artist`, and the integers of the song's `genre` (according to the genres API above) and `year`.
+Each song's metadata file must contain five data points: `title`, `album`, `artist`, and the integers of the song's `genre` (according to the genres API above) and `year`.
 
 - - -
 
@@ -250,10 +250,11 @@ In your FastAPI application, add the following line to the `requirements.txt` fi
 
 To develop locally you will also need to install that package in your local environment using `pip`, `pip3`, `pipenv install`, etc.
 
-At the top of your FastAPI code, import the package:
+At the top of your FastAPI code, import the package and its error handler:
 
 ```
 import mysql.connector
+from mysql.connector import Error
 ```
 
 ### 2. Set up your connection string
@@ -275,6 +276,8 @@ Find the password value from Canvas and set it in your local environment using t
 export DBPASS='xxxxxxxxx'
 ```
 
+> **NOTE:** There is a dollar sign `$` in the password, which as a special character can be misread. The way to avoid this is by escaping it with a backslash immediately before the character. So instead of `$` escape it with `\$`.
+
 Finally, bring all of these elements together into a single DB connection string, and create a cursor using that:
 
 ```
@@ -284,12 +287,33 @@ cur=db.cursor()
 
 Try running your application and see if you encounter errors. Debug as necessary.
 
-### 3. Create a query within a FastAPI route/endpoint
+### 3. Enable CORS in your FastAPI application
+
+**CORS** (Cross-Origin Resource Sharing) is a security model that limits what systems are allowed to communicate with an API. For our purposes we want to allow ALL connections. 
+
+To set this up, insert this block below your API definition. Find this line near the top of `app/main.py` in your FastAPI:
+```
+app = FastAPI()
+```
+Add this code to it:
+```
+app = FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+CORS is now enabled on all of your resources, methods and origins (external connections that want to query your API).
+
+### 4. Create a query within a FastAPI route/endpoint
 
 Here is the code for the `/genres` endpoint. Paste this into your FastAPI application and test:
 
 ```
-@app.route('/genres', methods=['GET'], cors=True)
+@app.get('/genres')
 def get_genres():
     query = "SELECT * FROM genres ORDER BY genreid;"
     try:    
@@ -299,25 +323,20 @@ def get_genres():
         json_data=[]
         for result in results:
             json_data.append(dict(zip(headers,result)))
-        output = json.dumps(json_data)
-        return(output)
-    except mysql.connector.Error as e:
-        print("MySQL Error: ", str(e))
-        return None
-    cur.close()
+        return(json_data)
+    except Error as e:
+        return {"Error": "MySQL Error: " + str(e)}
 ```
 
 A few notes about the block above:
 
-- FastAPI requires the route decorator, which specifies the METHOD for that endpoint.
-- The `cors` value is unique to APIs, and indicates that other websites can fetch data from this API. (This is desired.)
-- The function associated with the decorator takes no parameters.
+- FastAPI requires a method decorator. You do not need additional method or cors attributes in it.
+- The function associated with the decorator takes no parameters and must be uniquely named from other functions.
 - The query is standard SQL with no parameters or string replacement.
-- The `try` block executes the SQL using the cursor, creates a header row, fetches all results, then loads the headers and values as a dictionary in each row. It is then output as JSON and returned.
-- Generic error handling is in place to display any connection or query issues.
-- Note the cursor is closed at the end of each function.
+- The `try` block executes the SQL using the cursor, creates a header row, fetches all results, then loads the headers and values as a dictionary in each row. It is automatically formatted as JSON and returned.
+- Generic error handling is in place to display any connection or query issues. Any error will be displayed as API output.
 
-### 4. Create the `/songs` endpoint in your API
+### 5. Create the `/songs` endpoint in your API
 
 Based on the code above, create another endpoint and function for the `/songs` endpoint. This should return values like [**this**](https://bv1e9klemd.execute-api.us-east-1.amazonaws.com/api/songs).
 
@@ -355,6 +374,8 @@ Finally, using the full container image name, run the container in detached mode
       -e DBPASS="xxxxxx" \
       ghcr.io/xxxx/fastapi-demo:1.17
 
+**BE SURE TO ESCAPE THE DOLLAR SIGN IN THE PASSWORD** with `\$` when you run this command.
+
 Issue this command to see if your container is running and get its Container ID:
 
     docker ps
@@ -365,13 +386,13 @@ If you want to see the output logs of the container as it runs, specify the cont
 
 To stop the container:
 
-    docker stop zzzzz
+    docker stop zzzzzz
 
 #### Test Your EC2-based API
 
 Open a browser tab to the IP address of your EC2 instance. You should hopefully see a `{"hello":"world"}` message or something similar. 
 
-Go to your `/songs` endpoint to see if you have good results.
+Go to your `/genres` and `/songs` endpoints to see if you have good results.
 
 ## STEP SIX - Set up and test your Web UI
 
