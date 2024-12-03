@@ -11,7 +11,7 @@ S3_BUCKET = 'ydp7xv-dp1-spotify'
 s3 = boto3.client('s3')
 
 # base URL for accessing the files
-baseurl = 'https://ydp7xv-dp1-spotify.s3-website-us-east-1.amazonaws.com/'
+baseurl = 'https://ydp7xv-dp1-spotify.s3.us-east-1.amazonaws.com/'
 
 # database things
 DBHOST = os.getenv('DBHOST')
@@ -39,8 +39,8 @@ def s3_handler(event):
     TITLE = data.get('title')
     ALBUM = data.get('album')
     ARTIST = data.get('artist')
-    YEAR = data.get('year')
     GENRE = data.get('genre')
+    YEAR = data.get('year')
 
     # get the unique ID for the bundle to build the mp3 and jpg urls
     # you get 5 data points in each new JSON file that arrives, but you need 7 fields for the INSERT. The two additional values are
@@ -56,7 +56,7 @@ def s3_handler(event):
     # try to insert the song into the database
     try:
       add_song = ("INSERT INTO songs "
-               "(title, album, artist, genre, file, image, year) "
+               "(title, album, artist, year, file, image, genre) "
                "VALUES (%s, %s, %s, %s, %s, %s, %s)")
       song_vals = (TITLE, ALBUM, ARTIST, YEAR, MP3, IMG, GENRE)
       cur.execute(add_song, song_vals)
